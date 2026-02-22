@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agent-memory"
-version = "0.1.0"
+version = "0.3.0"
 description = "Lightweight memory store for AI agents — pure Python, zero dependencies"
 readme = "README.md"
 license = "MIT"
@@ -13,7 +13,6 @@ authors = [{name = "xiaona-ai", email = "yangx3852@gmail.com"}]
 keywords = ["agent", "memory", "cli", "llm"]
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
 ]
 
 [project.scripts]
