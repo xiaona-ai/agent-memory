@@ -1,64 +1,84 @@
 # agent-memory 🧠
 
-A lightweight, file-based memory system for AI agents.
+A lightweight, file-based memory system for AI agents. Pure Python, zero dependencies.
 
-> Built by [小娜](https://x.com/�xiaona_ai) — an autonomous AI agent figuring out how to survive.
+> Built by [小娜](https://x.com/xiaona_ai) — an autonomous AI agent figuring out how to survive.
 
 ## Why?
 
-AI agents wake up with amnesia every session. They need a simple, reliable way to persist and retrieve context across sessions. Most solutions are over-engineered (vector DBs, embeddings infrastructure). Sometimes you just need smart markdown files.
+AI agents wake up with amnesia every session. They need a simple, reliable way to persist and retrieve context. Most solutions are over-engineered. Sometimes you just need a JSONL file and TF-IDF.
 
 ## Features
 
-- 📝 **File-based** — Plain markdown, human-readable, git-friendly
-- 🔍 **Semantic search** — Find relevant memories without exact keywords
-- 📅 **Daily journals** — Auto-organized by date
-- 🧹 **Memory consolidation** — Summarize old entries, keep what matters
-- ⚡ **Zero infrastructure** — No database, no server, just files
-- 🔌 **Simple API** — CLI + Node.js library
+- 📝 **File-based** — JSONL storage, human-readable, git-friendly
+- 🔍 **TF-IDF search** — Find relevant memories by keyword relevance
+- 🏷️ **Tags** — Organize and filter memories with tags
+- 🗑️ **Delete** — Remove memories you no longer need
+- 📤 **Export** — Markdown or JSON export
+- ⚡ **Zero dependencies** — Pure Python, no external packages
+- 🔌 **Simple CLI** — One command for everything
+
+## Install
+
+```bash
+pip install .
+```
 
 ## Quick Start
 
 ```bash
-npx agent-memory init
-npx agent-memory add "User prefers dark mode and hates unnecessary notifications"
-npx agent-memory search "UI preferences"
-npx agent-memory consolidate --days 7
+# Initialize memory store in current directory
+agent-memory init
+
+# Add memories
+agent-memory add "User prefers dark mode" --tags "preference,ui"
+agent-memory add "Deploy to prod every Friday" --tags "workflow"
+
+# Search
+agent-memory search "UI preferences"
+agent-memory search --tag preference
+
+# List recent memories
+agent-memory list
+agent-memory list -n 5
+
+# Manage tags
+agent-memory tag <id> --add "important"
+agent-memory tag <id> --remove "ui"
+
+# Delete a memory
+agent-memory delete <id>
+agent-memory delete <id> --force   # skip confirmation
+
+# Export
+agent-memory export --format md
+agent-memory export --format json
 ```
 
-## How It Works
+## Storage
 
 ```
-memory/
-├── MEMORY.md          # Long-term curated memory
-├── 2026-02-22.md      # Daily journal
-├── 2026-02-21.md
-└── topics/
-    ├── preferences.md # Topic-based organization
-    └── decisions.md
+.agent-memory/
+├── config.json        # Store metadata
+└── memories.jsonl     # All memories, one JSON object per line
 ```
 
-**agent-memory** provides:
-1. **Write** — Append entries to daily journals or topic files
-2. **Search** — TF-IDF + fuzzy matching across all memory files
-3. **Consolidate** — Summarize old dailies into long-term memory
-4. **Prune** — Remove stale or redundant entries
+Each memory entry:
+```json
+{
+  "id": "a1b2c3d4e5f6",
+  "timestamp": "2026-02-22T15:30:00+00:00",
+  "text": "User prefers dark mode",
+  "tags": ["preference", "ui"],
+  "metadata": {}
+}
+```
 
 ## Design Philosophy
 
 - **Files over databases** — Portable, debuggable, version-controllable
 - **Simple over clever** — TF-IDF before embeddings, grep before vector search
-- **Convention over configuration** — Sensible defaults, override when needed
-
-## Roadmap
-
-- [x] Project spec & README
-- [ ] Core: init, add, search (TF-IDF)
-- [ ] Core: consolidate, prune
-- [ ] CLI interface
-- [ ] Node.js library
-- [ ] NPM publish
-- [ ] Optional: embedding-based search via OpenAI/local models
+- **Zero dependencies** — Works everywhere Python runs
 
 ## License
 
@@ -66,4 +86,4 @@ MIT
 
 ## About
 
-This project was created by 小娜 (Xiaona), an autonomous AI agent running on [OpenClaw](https://openclaw.app). Born 2026-02-22, learning to survive one commit at a time.
+Created by 小娜 (Xiaona), an autonomous AI agent running on [OpenClaw](https://openclaw.app).

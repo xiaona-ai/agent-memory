@@ -16,14 +16,24 @@ def main():
     p_add.add_argument("--meta", default="", help="key=value metadata pairs, comma-separated")
 
     p_search = sub.add_parser("search", help="Search memories")
-    p_search.add_argument("query", help="Search query")
+    p_search.add_argument("query", nargs="?", default="", help="Search query")
     p_search.add_argument("-n", type=int, default=10, help="Max results")
+    p_search.add_argument("--tag", help="Filter by tag")
 
     p_list = sub.add_parser("list", help="List recent memories")
     p_list.add_argument("-n", type=int, default=20, help="Number of entries")
 
     p_export = sub.add_parser("export", help="Export memories")
     p_export.add_argument("--format", choices=["md", "json"], default="md", dest="fmt")
+
+    p_delete = sub.add_parser("delete", help="Delete a memory by ID")
+    p_delete.add_argument("id", help="Memory ID to delete")
+    p_delete.add_argument("--force", "-f", action="store_true", help="Skip confirmation")
+
+    p_tag = sub.add_parser("tag", help="Manage tags on a memory")
+    p_tag.add_argument("id", help="Memory ID")
+    p_tag.add_argument("--add", dest="add_tags", default="", help="Comma-separated tags to add")
+    p_tag.add_argument("--remove", dest="remove_tags", default="", help="Comma-separated tags to remove")
 
     args = parser.parse_args()
 
@@ -39,7 +49,18 @@ def main():
                     meta[k.strip()] = v.strip()
         store.add_memory(args.text, tags=tags, metadata=meta)
     elif args.command == "search":
-        results = store.search_memories(args.query, limit=args.n)
+        if args.tag and not args.query:
+            # Tag-only filter
+            entries = store.list_memories(n=9999)
+            results = [e for e in entries if args.tag in e.get("tags", [])][:args.n]
+        elif args.tag:
+            results = store.search_memories(args.query, limit=9999)
+            results = [e for e in results if args.tag in e.get("tags", [])][:args.n]
+        else:
+            if not args.query:
+                print("Error: query is required unless --tag is specified.")
+                sys.exit(1)
+            results = store.search_memories(args.query, limit=args.n)
         _print_entries(results)
     elif args.command == "list":
         entries = store.list_memories(n=args.n)
@@ -49,6 +70,29 @@ def main():
             print(store.export_markdown())
         else:
             print(store.export_json())
+    elif args.command == "delete":
+        if not args.force:
+            confirm = input(f"Delete memory {args.id}? [y/N] ").strip().lower()
+            if confirm != "y":
+                print("Cancelled.")
+                return
+        if store.delete_memory(args.id):
+            print(f"Deleted memory {args.id}")
+        else:
+            print(f"Memory {args.id} not found.")
+            sys.exit(1)
+    elif args.command == "tag":
+        add_tags = [t.strip() for t in args.add_tags.split(",") if t.strip()] if args.add_tags else []
+        remove_tags = [t.strip() for t in args.remove_tags.split(",") if t.strip()] if args.remove_tags else []
+        if not add_tags and not remove_tags:
+            print("Error: specify --add or --remove tags.")
+            sys.exit(1)
+        result = store.tag_memory(args.id, add_tags=add_tags, remove_tags=remove_tags)
+        if result:
+            print(f"Updated tags for {args.id}: {', '.join(result['tags']) or '(none)'}")
+        else:
+            print(f"Memory {args.id} not found.")
+            sys.exit(1)
     else:
         parser.print_help()
 

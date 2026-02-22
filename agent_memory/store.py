@@ -109,6 +109,42 @@ def search_memories(query: str, limit: int = 10) -> list[dict]:
     return [e for _, e in scored[:limit]]
 
 
+def delete_memory(memory_id: str) -> bool:
+    """Delete a memory by ID. Returns True if found and deleted."""
+    d = _root()
+    entries = _load_all()
+    new_entries = [e for e in entries if e["id"] != memory_id]
+    if len(new_entries) == len(entries):
+        return False
+    with open(d / MEMORIES_FILE, "w") as f:
+        for e in new_entries:
+            f.write(json.dumps(e, ensure_ascii=False) + "\n")
+    return True
+
+
+def tag_memory(memory_id: str, add_tags: list[str] = None, remove_tags: list[str] = None) -> dict | None:
+    """Add or remove tags from a memory. Returns updated entry or None if not found."""
+    d = _root()
+    entries = _load_all()
+    found = None
+    for e in entries:
+        if e["id"] == memory_id:
+            tags = set(e.get("tags", []))
+            if add_tags:
+                tags.update(add_tags)
+            if remove_tags:
+                tags -= set(remove_tags)
+            e["tags"] = sorted(tags)
+            found = e
+            break
+    if not found:
+        return None
+    with open(d / MEMORIES_FILE, "w") as f:
+        for e in entries:
+            f.write(json.dumps(e, ensure_ascii=False) + "\n")
+    return found
+
+
 def export_markdown() -> str:
     entries = _load_all()
     lines = ["# Agent Memory Export", ""]
