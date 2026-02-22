@@ -17,6 +17,7 @@ AI agents wake up with amnesia every session. They need a simple, reliable way t
 - 📤 **Export** — Markdown or JSON export
 - ⚙️ **Configurable** — Customize storage path, export format, search limits
 - ⚡ **Zero dependencies** — Pure Python, no external packages
+- 🔌 **Python SDK** — Use as a library: `from agent_memory import Memory`
 - 🔌 **Simple CLI** — One command for everything
 
 ## Install
@@ -25,7 +26,30 @@ AI agents wake up with amnesia every session. They need a simple, reliable way t
 pip install .
 ```
 
-## Quick Start
+## Python SDK
+
+```python
+from agent_memory import Memory
+
+mem = Memory("/path/to/project")
+mem.init()
+
+# Add and search
+mem.add("User prefers dark mode", tags=["preference"])
+results = mem.search("dark mode")
+
+# Tag, delete, export
+mem.tag(results[0]["id"], add=["important"])
+mem.delete(results[0]["id"])
+print(mem.export("json"))
+
+# Basics
+print(len(mem))          # count
+mem.get("a1b2c3d4e5f6")  # by ID
+mem.clear()              # delete all
+```
+
+## CLI Quick Start
 
 ```bash
 # Initialize memory store in current directory
