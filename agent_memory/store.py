@@ -7,19 +7,26 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-STORE_DIR = ".agent-memory"
+from .config import STORE_DIR, CONFIG_FILE, load_config, create_default_config
+
 MEMORIES_FILE = "memories.jsonl"
-CONFIG_FILE = "config.json"
 
 
 def _root() -> Path:
-    """Walk up to find .agent-memory/, fallback to cwd."""
+    """Resolve store directory from config or walk up to find .agent-memory/."""
+    config = load_config()
+    store_path = config.get("store_path", STORE_DIR)
+    # If absolute path, use directly
+    sp = Path(store_path)
+    if sp.is_absolute():
+        return sp
+    # Walk up to find existing store
     p = Path.cwd()
     while p != p.parent:
-        if (p / STORE_DIR).is_dir():
-            return p / STORE_DIR
+        if (p / store_path).is_dir():
+            return p / store_path
         p = p.parent
-    return Path.cwd() / STORE_DIR
+    return Path.cwd() / store_path
 
 
 def init_store() -> Path:
@@ -27,7 +34,7 @@ def init_store() -> Path:
     d.mkdir(exist_ok=True)
     cfg = d / CONFIG_FILE
     if not cfg.exists():
-        cfg.write_text(json.dumps({"version": "0.1.0"}, indent=2) + "\n")
+        create_default_config(d)
     mem = d / MEMORIES_FILE
     if not mem.exists():
         mem.touch()
@@ -73,8 +80,11 @@ def _tokenize(text: str) -> list[str]:
     return re.findall(r"\w+", text.lower())
 
 
-def search_memories(query: str, limit: int = 10) -> list[dict]:
-    """Simple TF-IDF keyword search."""
+def search_memories(query: str, limit: int | None = None) -> list[dict]:
+    """Simple TF-IDF keyword search. limit defaults to config max_results."""
+    if limit is None:
+        config = load_config()
+        limit = config.get("max_results", 10)
     entries = _load_all()
     if not entries:
         return []
@@ -143,6 +153,16 @@ def tag_memory(memory_id: str, add_tags: list[str] = None, remove_tags: list[str
         for e in entries:
             f.write(json.dumps(e, ensure_ascii=False) + "\n")
     return found
+
+
+def export_memories(fmt: str | None = None) -> str:
+    """Export memories. fmt defaults to config default_export_format."""
+    if fmt is None:
+        config = load_config()
+        fmt = config.get("default_export_format", "md")
+    if fmt == "json":
+        return export_json()
+    return export_markdown()
 
 
 def export_markdown() -> str:

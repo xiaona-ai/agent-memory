@@ -15,6 +15,7 @@ AI agents wake up with amnesia every session. They need a simple, reliable way t
 - 🏷️ **Tags** — Organize and filter memories with tags
 - 🗑️ **Delete** — Remove memories you no longer need
 - 📤 **Export** — Markdown or JSON export
+- ⚙️ **Configurable** — Customize storage path, export format, search limits
 - ⚡ **Zero dependencies** — Pure Python, no external packages
 - 🔌 **Simple CLI** — One command for everything
 
@@ -51,15 +52,40 @@ agent-memory delete <id>
 agent-memory delete <id> --force   # skip confirmation
 
 # Export
+agent-memory export                # uses default format from config
 agent-memory export --format md
 agent-memory export --format json
+
+# Show current configuration
+agent-memory config
 ```
+
+## Configuration
+
+`agent-memory init` creates `.agent-memory/config.json` with sensible defaults:
+
+```json
+{
+  "version": "0.2.0",
+  "store_path": ".agent-memory",
+  "default_export_format": "md",
+  "max_results": 10
+}
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `store_path` | Directory for memory storage (relative or absolute) | `.agent-memory` |
+| `default_export_format` | Default export format (`md` or `json`) | `md` |
+| `max_results` | Maximum search results returned | `10` |
+
+Edit `config.json` directly to customize behavior. All commands read from this file automatically.
 
 ## Storage
 
 ```
 .agent-memory/
-├── config.json        # Store metadata
+├── config.json        # Configuration
 └── memories.jsonl     # All memories, one JSON object per line
 ```
 
