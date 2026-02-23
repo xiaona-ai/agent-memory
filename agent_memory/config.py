@@ -1,7 +1,7 @@
 """Configuration management for agent-memory."""
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, Optional
 
 STORE_DIR = ".agent-memory"
 CONFIG_FILE = "config.json"
@@ -15,7 +15,7 @@ DEFAULT_CONFIG = {
 }
 
 
-def _find_config_path() -> Path | None:
+def _find_config_path() -> Optional[Path]:
     """Walk up to find .agent-memory/config.json, return its parent or None."""
     p = Path.cwd()
     while p != p.parent:
@@ -27,7 +27,7 @@ def _find_config_path() -> Path | None:
     return cfg if cfg.exists() else None
 
 
-def load_config() -> dict[str, Any]:
+def load_config() -> Dict[str, Any]:
     """Load config from .agent-memory/config.json, merged with defaults."""
     cfg_path = _find_config_path()
     config = dict(DEFAULT_CONFIG)
@@ -41,7 +41,7 @@ def load_config() -> dict[str, Any]:
     return config
 
 
-def save_config(config: dict[str, Any], target_dir: Path | None = None) -> Path:
+def save_config(config: Dict[str, Any], target_dir: Optional[Path] = None) -> Path:
     """Save config to .agent-memory/config.json. Returns the config file path."""
     if target_dir is None:
         cfg_path = _find_config_path()

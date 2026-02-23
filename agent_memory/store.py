@@ -7,6 +7,7 @@ import uuid
 from datetime import datetime, timezone
 from math import exp
 from pathlib import Path
+from typing import List, Optional
 
 from .config import STORE_DIR, CONFIG_FILE, load_config, create_default_config
 
@@ -62,7 +63,7 @@ def add_memory(text: str, tags=None, metadata=None, importance: int = 3) -> dict
     return entry
 
 
-def _load_all() -> list[dict]:
+def _load_all() -> List[dict]:
     d = _root()
     p = d / MEMORIES_FILE
     if not p.exists():
@@ -75,15 +76,15 @@ def _load_all() -> list[dict]:
     return entries
 
 
-def list_memories(n: int = 20) -> list[dict]:
+def list_memories(n: int = 20) -> List[dict]:
     return _load_all()[-n:]
 
 
-def _tokenize(text: str) -> list[str]:
+def _tokenize(text: str) -> List[str]:
     return re.findall(r"\w+", text.lower())
 
 
-def search_memories(query: str, limit: int | None = None) -> list[dict]:
+def search_memories(query: str, limit: Optional[int] = None) -> List[dict]:
     """TF-IDF keyword search with time-decay and importance scoring.
 
     final_score = tfidf_score * time_factor * (importance / 3.0)
@@ -156,7 +157,7 @@ def delete_memory(memory_id: str) -> bool:
     return True
 
 
-def tag_memory(memory_id: str, add_tags: list[str] = None, remove_tags: list[str] = None) -> dict | None:
+def tag_memory(memory_id: str, add_tags: List[str] = None, remove_tags: List[str] = None) -> Optional[dict]:
     """Add or remove tags from a memory. Returns updated entry or None if not found."""
     d = _root()
     entries = _load_all()
@@ -179,7 +180,7 @@ def tag_memory(memory_id: str, add_tags: list[str] = None, remove_tags: list[str
     return found
 
 
-def export_memories(fmt: str | None = None) -> str:
+def export_memories(fmt: Optional[str] = None) -> str:
     """Export memories. fmt defaults to config default_export_format."""
     if fmt is None:
         config = load_config()
