@@ -7,7 +7,7 @@ name = "agent-memory-lite"
 version = "0.4.0"
 description = "Lightweight memory store for AI agents — pure Python, zero dependencies"
 readme = "README.md"
-license = "MIT"
+license = {text = "MIT"}
 requires-python = ">=3.8"
 authors = [{name = "xiaona-ai", email = "yangx3852@gmail.com"}]
 keywords = ["agent", "memory", "cli", "llm"]
