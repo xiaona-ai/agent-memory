@@ -26,7 +26,7 @@ AI agents wake up with amnesia every session. They need a simple, reliable way t
 ## Install
 
 ```bash
-pip install .
+pip install agent-memory-lite
 ```
 
 ## Python SDK
