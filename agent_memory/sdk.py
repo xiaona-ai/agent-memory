@@ -23,6 +23,8 @@ from math import exp
 from pathlib import Path
 from typing import Optional
 
+from .embeddings import VectorStore
+
 
 STORE_DIR = ".agent-memory"
 MEMORIES_FILE = "memories.jsonl"
@@ -49,6 +51,7 @@ class Memory:
         self._root = Path(path or os.getcwd())
         self._config = {**DEFAULT_CONFIG, **(config or {})}
         self._store_dir: Optional[Path] = None
+        self._vector_store: Optional[VectorStore] = None
 
     @property
     def store(self) -> Path:
@@ -66,6 +69,13 @@ class Memory:
     @property
     def _memories_path(self) -> Path:
         return self.store / MEMORIES_FILE
+
+    @property
+    def vectors(self) -> VectorStore:
+        """Access the vector store (lazy init)."""
+        if self._vector_store is None:
+            self._vector_store = VectorStore(self.store, self._config)
+        return self._vector_store
 
     def init(self) -> Path:
         """Initialize the memory store. Returns the store directory."""
@@ -120,6 +130,9 @@ class Memory:
         }
         with open(self._memories_path, "a") as f:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        # Auto-embed if configured
+        if self.vectors.enabled:
+            self.vectors.embed_and_store(entry["id"], text)
         return entry
 
     def list(self, limit: int = 20) -> list:
@@ -138,27 +151,44 @@ class Memory:
         query: str,
         limit: Optional[int] = None,
         tag: Optional[str] = None,
+        mode: Optional[str] = None,
     ) -> list:
-        """TF-IDF keyword search with time-decay and importance scoring."""
+        """Search memories.
+
+        Args:
+            query: Search query string.
+            limit: Max results (default from config).
+            tag: Filter by tag before searching.
+            mode: "keyword" (default TF-IDF), "vector" (embedding similarity),
+                  or "hybrid" (weighted combination of both).
+        """
         if limit is None:
             limit = self._config.get("max_results", 10)
-        decay_lambda = self._config.get("time_decay_lambda", 0.01)
-        entries = self._load_all()
 
-        # Tag filter
+        if mode is None:
+            mode = "vector" if self.vectors.enabled else "keyword"
+
+        entries = self._load_all()
         if tag:
             entries = [e for e in entries if tag in e.get("tags", [])]
-
         if not entries:
             return []
 
+        if mode == "vector" and self.vectors.enabled:
+            return self.vectors.search(query, entries, limit)
+        elif mode == "hybrid" and self.vectors.enabled:
+            return self._hybrid_search(query, entries, limit)
+        else:
+            return self._keyword_search(query, entries, limit)
+
+    def _keyword_search(self, query: str, entries: list, limit: int) -> list:
+        """TF-IDF keyword search with time-decay and importance scoring."""
+        decay_lambda = self._config.get("time_decay_lambda", 0.01)
         query_tokens = set(self._tokenize(query))
         if not query_tokens:
             return entries[-limit:]
 
         now = datetime.now(timezone.utc)
-
-        # TF-IDF scoring
         docs = []
         for e in entries:
             tokens = self._tokenize(e["text"] + " " + " ".join(e.get("tags", [])))
@@ -175,12 +205,11 @@ class Memory:
             for t in tokens:
                 tf[t] = tf.get(t, 0) + 1
             tfidf_score = sum(
-                tf[qt] * math.log((N + 1) / (df[qt] + 1))
+                tf[qt] * math.log((N + 1) / (df[qt] + 0.5))
                 for qt in query_tokens
                 if qt in tf and qt in df
             )
             if tfidf_score > 0:
-                # Time decay
                 ts = entries[i].get("timestamp", "")
                 try:
                     entry_time = datetime.fromisoformat(ts)
@@ -188,15 +217,50 @@ class Memory:
                 except (ValueError, TypeError):
                     days_old = 0.0
                 time_factor = exp(-decay_lambda * days_old) if decay_lambda > 0 else 1.0
-
-                # Importance
                 importance = entries[i].get("importance", 3)
                 importance_factor = importance / 3.0
-
                 final_score = tfidf_score * time_factor * importance_factor
                 scored.append((final_score, entries[i]))
         scored.sort(key=lambda x: -x[0])
         return [e for _, e in scored[:limit]]
+
+    def _hybrid_search(self, query: str, entries: list, limit: int) -> list:
+        """Combine keyword and vector scores (0.4 keyword + 0.6 vector)."""
+        from .embeddings import cosine_similarity, get_embeddings
+
+        # Keyword scores (normalized)
+        keyword_results = self._keyword_search(query, entries, len(entries))
+        keyword_scores = {}
+        if keyword_results:
+            max_score = 1.0  # We don't have raw scores here, use rank
+            for rank, e in enumerate(keyword_results):
+                keyword_scores[e["id"]] = 1.0 - (rank / len(keyword_results))
+
+        # Vector scores
+        vector_scores = {}
+        query_vec_result = get_embeddings([query], self._config)
+        if query_vec_result:
+            from .embeddings import VectorStore
+            vs = VectorStore(self.store, self._config)
+            vectors = vs._load_vectors()
+            for e in entries:
+                vec = vectors.get(e["id"])
+                if vec:
+                    vector_scores[e["id"]] = cosine_similarity(query_vec_result[0], vec)
+
+        # Combine
+        combined = []
+        for e in entries:
+            ks = keyword_scores.get(e["id"], 0.0)
+            vs_score = vector_scores.get(e["id"], 0.0)
+            combined.append((0.4 * ks + 0.6 * vs_score, e))
+        combined.sort(key=lambda x: -x[0])
+        return [e for score, e in combined[:limit] if score > 0]
+
+    def rebuild_vectors(self, batch_size: int = 100) -> int:
+        """Rebuild all vector embeddings from scratch. Returns count embedded."""
+        entries = self._load_all()
+        return self.vectors.rebuild(entries, batch_size)
 
     def delete(self, memory_id: str) -> bool:
         """Delete a memory by ID. Returns True if found."""
@@ -205,6 +269,9 @@ class Memory:
         if len(new) == len(entries):
             return False
         self._save_all(new)
+        # Clean up vector
+        if self.vectors.enabled:
+            self.vectors.delete(memory_id)
         return True
 
     def tag(

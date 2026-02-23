@@ -19,6 +19,7 @@ AI agents wake up with amnesia every session. They need a simple, reliable way t
 - 📤 **Export** — Markdown or JSON export
 - ⚙️ **Configurable** — Customize storage path, export format, search limits
 - ⚡ **Zero dependencies** — Pure Python, no external packages
+- 🧲 **Optional vector search** — OpenAI-compatible embedding API support (keyword/vector/hybrid modes)
 - 🔌 **Python SDK** — Use as a library: `from agent_memory import Memory`
 - 🔌 **Simple CLI** — One command for everything
 
@@ -116,7 +117,8 @@ Edit `config.json` directly to customize behavior. All commands read from this f
 ```
 .agent-memory/
 ├── config.json        # Configuration
-└── memories.jsonl     # All memories, one JSON object per line
+├── memories.jsonl     # All memories, one JSON object per line
+└── vectors.jsonl      # Vector embeddings (optional, auto-created)
 ```
 
 Each memory entry:
@@ -142,6 +144,44 @@ final_score = tfidf_score × time_factor × (importance / 3.0)
 - **TF-IDF** — keyword relevance scoring
 - **Time decay** — `time_factor = exp(-λ × days_old)` where λ = `time_decay_lambda` from config. Set to `0` to disable.
 - **Importance** — memories with higher importance (1-5, default 3) rank higher
+
+## Vector Search (Optional)
+
+For semantic search, configure an OpenAI-compatible embedding API:
+
+```json
+{
+  "embedding": {
+    "api_base": "https://api.openai.com/v1",
+    "api_key": "sk-...",
+    "model": "text-embedding-3-small"
+  }
+}
+```
+
+Or use environment variables: `AGENT_MEMORY_EMBEDDING_API_BASE`, `AGENT_MEMORY_EMBEDDING_API_KEY`, `AGENT_MEMORY_EMBEDDING_MODEL`.
+
+Three search modes:
+- **`keyword`** — TF-IDF (default when no embedding configured)
+- **`vector`** — Cosine similarity on embeddings (default when embedding configured)
+- **`hybrid`** — Weighted combination (0.4 keyword + 0.6 vector)
+
+```python
+mem.search("deploy schedule", mode="keyword")  # force keyword
+mem.search("deploy schedule", mode="vector")   # force vector
+mem.search("deploy schedule", mode="hybrid")   # best of both
+
+# Rebuild vectors for existing memories
+mem.rebuild_vectors()
+```
+
+CLI:
+```bash
+agent-memory search "deploy schedule" --mode vector
+agent-memory rebuild-vectors
+```
+
+Vector embeddings are stored in `.agent-memory/vectors.jsonl`. No numpy or torch required — cosine similarity is pure Python.
 
 ## Design Philosophy
 

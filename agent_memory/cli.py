@@ -23,6 +23,7 @@ def main():
     p_search.add_argument("query", nargs="?", default="", help="Search query")
     p_search.add_argument("-n", type=int, default=None, help="Max results (default: from config)")
     p_search.add_argument("--tag", help="Filter by tag")
+    p_search.add_argument("--mode", choices=["keyword", "vector", "hybrid"], default=None, help="Search mode")
 
     p_list = sub.add_parser("list", help="List recent memories")
     p_list.add_argument("-n", type=int, default=20, help="Number of entries")
@@ -46,6 +47,7 @@ def main():
     p_tag.add_argument("--remove", dest="remove_tags", default="", help="Comma-separated tags to remove")
 
     sub.add_parser("config", help="Show current configuration")
+    sub.add_parser("rebuild-vectors", help="Rebuild vector embeddings for all memories")
 
     args = parser.parse_args()
 
@@ -61,18 +63,19 @@ def main():
                     meta[k.strip()] = v.strip()
         store.add_memory(args.text, tags=tags, metadata=meta, importance=args.importance)
     elif args.command == "search":
+        from .sdk import Memory
+        mem = Memory()
         max_results = args.n if args.n is not None else config.get("max_results", 10)
         if args.tag and not args.query:
-            entries = store.list_memories(n=9999)
-            results = [e for e in entries if args.tag in e.get("tags", [])][:max_results]
-        elif args.tag:
-            results = store.search_memories(args.query, limit=9999)
-            results = [e for e in results if args.tag in e.get("tags", [])][:max_results]
+            results = mem.search("", limit=max_results, tag=args.tag, mode="keyword")
+            if not results:
+                entries = mem.list(limit=9999)
+                results = [e for e in entries if args.tag in e.get("tags", [])][:max_results]
+        elif not args.query:
+            print("Error: query is required unless --tag is specified.")
+            sys.exit(1)
         else:
-            if not args.query:
-                print("Error: query is required unless --tag is specified.")
-                sys.exit(1)
-            results = store.search_memories(args.query, limit=max_results)
+            results = mem.search(args.query, limit=max_results, tag=args.tag, mode=args.mode)
         _print_entries(results)
     elif args.command == "list":
         entries = store.list_memories(n=args.n)
@@ -106,6 +109,14 @@ def main():
     elif args.command == "config":
         import json
         print(json.dumps(config, indent=2, ensure_ascii=False))
+    elif args.command == "rebuild-vectors":
+        from .sdk import Memory
+        mem = Memory()
+        count = mem.rebuild_vectors()
+        if count > 0:
+            print(f"Rebuilt vectors for {count} memories.")
+        else:
+            print("No vectors built. Check embedding config in .agent-memory/config.json")
     else:
         parser.print_help()
 

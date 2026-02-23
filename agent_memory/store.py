@@ -122,7 +122,7 @@ def search_memories(query: str, limit: int | None = None) -> list[dict]:
         tfidf_score = 0.0
         for qt in query_tokens:
             if qt in tf and qt in df:
-                tfidf_score += tf[qt] * math.log((N + 1) / (df[qt] + 1))
+                tfidf_score += tf[qt] * math.log((N + 1) / (df[qt] + 0.5))
         if tfidf_score > 0:
             # Time decay
             ts = entries[i].get("timestamp", "")
