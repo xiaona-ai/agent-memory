@@ -7,10 +7,11 @@ STORE_DIR = ".agent-memory"
 CONFIG_FILE = "config.json"
 
 DEFAULT_CONFIG = {
-    "version": "0.2.0",
+    "version": "0.4.0",
     "store_path": ".agent-memory",
     "default_export_format": "md",
     "max_results": 10,
+    "time_decay_lambda": 0.01,
 }
 
 

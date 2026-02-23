@@ -17,6 +17,7 @@ def main():
     p_add.add_argument("text", help="Memory text")
     p_add.add_argument("--tags", default="", help="Comma-separated tags")
     p_add.add_argument("--meta", default="", help="key=value metadata pairs, comma-separated")
+    p_add.add_argument("--importance", type=int, default=3, choices=range(1, 6), help="Importance level 1-5 (default: 3)")
 
     p_search = sub.add_parser("search", help="Search memories")
     p_search.add_argument("query", nargs="?", default="", help="Search query")
@@ -58,7 +59,7 @@ def main():
                 if "=" in pair:
                     k, v = pair.split("=", 1)
                     meta[k.strip()] = v.strip()
-        store.add_memory(args.text, tags=tags, metadata=meta)
+        store.add_memory(args.text, tags=tags, metadata=meta, importance=args.importance)
     elif args.command == "search":
         max_results = args.n if args.n is not None else config.get("max_results", 10)
         if args.tag and not args.query:

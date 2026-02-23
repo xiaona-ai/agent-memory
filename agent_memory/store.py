@@ -5,6 +5,7 @@ import os
 import re
 import uuid
 from datetime import datetime, timezone
+from math import exp
 from pathlib import Path
 
 from .config import STORE_DIR, CONFIG_FILE, load_config, create_default_config
@@ -42,16 +43,18 @@ def init_store() -> Path:
     return d
 
 
-def add_memory(text: str, tags=None, metadata=None) -> dict:
+def add_memory(text: str, tags=None, metadata=None, importance: int = 3) -> dict:
     d = _root()
     if not d.is_dir():
         raise FileNotFoundError("Not initialized. Run `agent-memory init` first.")
+    importance = max(1, min(5, int(importance)))
     entry = {
         "id": uuid.uuid4().hex[:12],
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "text": text,
         "tags": tags or [],
         "metadata": metadata or {},
+        "importance": importance,
     }
     with open(d / MEMORIES_FILE, "a") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
@@ -81,16 +84,23 @@ def _tokenize(text: str) -> list[str]:
 
 
 def search_memories(query: str, limit: int | None = None) -> list[dict]:
-    """Simple TF-IDF keyword search. limit defaults to config max_results."""
+    """TF-IDF keyword search with time-decay and importance scoring.
+
+    final_score = tfidf_score * time_factor * (importance / 3.0)
+    time_factor = exp(-lambda * days_old)
+    """
+    config = load_config()
     if limit is None:
-        config = load_config()
         limit = config.get("max_results", 10)
+    decay_lambda = config.get("time_decay_lambda", 0.01)
     entries = _load_all()
     if not entries:
         return []
     query_tokens = set(_tokenize(query))
     if not query_tokens:
         return entries[-limit:]
+
+    now = datetime.now(timezone.utc)
 
     # Build document frequency
     docs = []
@@ -109,12 +119,26 @@ def search_memories(query: str, limit: int | None = None) -> list[dict]:
         tf = {}
         for t in tokens:
             tf[t] = tf.get(t, 0) + 1
-        score = 0.0
+        tfidf_score = 0.0
         for qt in query_tokens:
             if qt in tf and qt in df:
-                score += tf[qt] * math.log((N + 1) / (df[qt] + 1))
-        if score > 0:
-            scored.append((score, entries[i]))
+                tfidf_score += tf[qt] * math.log((N + 1) / (df[qt] + 1))
+        if tfidf_score > 0:
+            # Time decay
+            ts = entries[i].get("timestamp", "")
+            try:
+                entry_time = datetime.fromisoformat(ts)
+                days_old = (now - entry_time).total_seconds() / 86400.0
+            except (ValueError, TypeError):
+                days_old = 0.0
+            time_factor = exp(-decay_lambda * days_old) if decay_lambda > 0 else 1.0
+
+            # Importance
+            importance = entries[i].get("importance", 3)
+            importance_factor = importance / 3.0
+
+            final_score = tfidf_score * time_factor * importance_factor
+            scored.append((final_score, entries[i]))
     scored.sort(key=lambda x: -x[0])
     return [e for _, e in scored[:limit]]
 

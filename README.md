@@ -12,6 +12,8 @@ AI agents wake up with amnesia every session. They need a simple, reliable way t
 
 - 📝 **File-based** — JSONL storage, human-readable, git-friendly
 - 🔍 **TF-IDF search** — Find relevant memories by keyword relevance
+- ⏳ **Time-decay scoring** — Recent memories rank higher (configurable)
+- ⭐ **Importance levels** — Priority 1-5 influences search ranking
 - 🏷️ **Tags** — Organize and filter memories with tags
 - 🗑️ **Delete** — Remove memories you no longer need
 - 📤 **Export** — Markdown or JSON export
@@ -36,6 +38,7 @@ mem.init()
 
 # Add and search
 mem.add("User prefers dark mode", tags=["preference"])
+mem.add("Critical alert", tags=["security"], importance=5)
 results = mem.search("dark mode")
 
 # Tag, delete, export
@@ -58,6 +61,7 @@ agent-memory init
 # Add memories
 agent-memory add "User prefers dark mode" --tags "preference,ui"
 agent-memory add "Deploy to prod every Friday" --tags "workflow"
+agent-memory add "Critical security fix" --tags "security" --importance 5
 
 # Search
 agent-memory search "UI preferences"
@@ -90,10 +94,11 @@ agent-memory config
 
 ```json
 {
-  "version": "0.2.0",
+  "version": "0.4.0",
   "store_path": ".agent-memory",
   "default_export_format": "md",
-  "max_results": 10
+  "max_results": 10,
+  "time_decay_lambda": 0.01
 }
 ```
 
@@ -102,6 +107,7 @@ agent-memory config
 | `store_path` | Directory for memory storage (relative or absolute) | `.agent-memory` |
 | `default_export_format` | Default export format (`md` or `json`) | `md` |
 | `max_results` | Maximum search results returned | `10` |
+| `time_decay_lambda` | Time decay rate for search scoring (0 = disabled) | `0.01` |
 
 Edit `config.json` directly to customize behavior. All commands read from this file automatically.
 
@@ -120,9 +126,22 @@ Each memory entry:
   "timestamp": "2026-02-22T15:30:00+00:00",
   "text": "User prefers dark mode",
   "tags": ["preference", "ui"],
-  "metadata": {}
+  "metadata": {},
+  "importance": 3
 }
 ```
+
+## Search Scoring
+
+Search results are ranked by a combined score:
+
+```
+final_score = tfidf_score × time_factor × (importance / 3.0)
+```
+
+- **TF-IDF** — keyword relevance scoring
+- **Time decay** — `time_factor = exp(-λ × days_old)` where λ = `time_decay_lambda` from config. Set to `0` to disable.
+- **Importance** — memories with higher importance (1-5, default 3) rank higher
 
 ## Design Philosophy
 
